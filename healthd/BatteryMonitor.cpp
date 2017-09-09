@@ -48,12 +48,13 @@
 
 #define POWER_SUPPLY_SUBSYSTEM "power_supply"
 #define POWER_SUPPLY_SYSFS_PATH "/sys/class/" POWER_SUPPLY_SUBSYSTEM
+#define SYSFS_BATTERY_CURRENT "/sys/class/power_supply/battery/current_now"
+#define SYSFS_BATTERY_VOLTAGE "/sys/class/power_supply/battery/voltage_now"
 #define DEV_GLOB "/sys/devices/platform/*gcdd/system_dev_stat"
 #define CDD_SYSTEM_DEVICE_TEMP 8
 #define FAKE_BATTERY_CAPACITY 42
 #define FAKE_BATTERY_TEMPERATURE 424
 #define MILLION 1.0e6
-#define DEFAULT_VBUS_VOLTAGE 5000000
 
 using HealthInfo_1_0 = android::hardware::health::V1_0::HealthInfo;
 using HealthInfo_2_0 = android::hardware::health::V2_0::HealthInfo;
@@ -604,23 +605,30 @@ void BatteryMonitor::updateValues(void) {
                 default:
                     KLOG_WARNING(LOG_TAG, "%s: Unknown power supply type\n", chargerName.c_str());
             }
-            path.clear();
-            path.appendFormat("%s/%s/current_max", POWER_SUPPLY_SYSFS_PATH, chargerName.c_str());
-            int ChargingCurrent = tryGetIntField(path).value_or(0);
+            int ChargingCurrent = 0;
+            int ChargingVoltage = 0;
 
-            int ChargingVoltage;
-            path.clear();
-            path.appendFormat("%s/%s/voltage_max", POWER_SUPPLY_SYSFS_PATH, chargerName.c_str());
-            if (auto vmax = tryGetIntField(path); vmax.ok() || vmax.error().code() != ENOENT) {
-                ChargingVoltage = vmax.value_or(0);
+            // Prefer battery current_now / voltage_now
+            if (access(SYSFS_BATTERY_CURRENT, R_OK) == 0) {
+                ChargingCurrent = abs(tryGetIntField(String8(SYSFS_BATTERY_CURRENT)).value_or(0));
             } else {
                 path.clear();
-                path.appendFormat("%s/%s/voltage_max_design", POWER_SUPPLY_SYSFS_PATH,
+                path.appendFormat("%s/%s/current_now", POWER_SUPPLY_SYSFS_PATH,
                                   chargerName.c_str());
-                if (auto vmax = tryGetIntField(path); vmax.ok() || vmax.error().code() != ENOENT)
-                    ChargingVoltage = vmax.value_or(0);
-                else
-                    ChargingVoltage = DEFAULT_VBUS_VOLTAGE;
+                if (access(path.c_str(), R_OK) == 0) {
+                    ChargingCurrent = abs(tryGetIntField(path).value_or(0));
+                }
+            }
+
+            if (access(SYSFS_BATTERY_VOLTAGE, R_OK) == 0) {
+                ChargingVoltage = abs(tryGetIntField(String8(SYSFS_BATTERY_VOLTAGE)).value_or(0));
+            } else {
+                path.clear();
+                path.appendFormat("%s/%s/voltage_now", POWER_SUPPLY_SYSFS_PATH,
+                                  chargerName.c_str());
+                if (access(path.c_str(), R_OK) == 0) {
+                    ChargingVoltage = abs(tryGetIntField(path).value_or(0));
+                }
             }
 
             double power =
