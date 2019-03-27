@@ -44,9 +44,9 @@ using android::base::GetBoolProperty;
 using android::base::StringPrintf;
 using android::base::unique_fd;
 
-static constexpr const char* CGROUP_PROCS_FILE = "/cgroup.procs";
-static constexpr const char* CGROUP_TASKS_FILE = "/tasks";
-static constexpr const char* CGROUP_TASKS_FILE_V2 = "/cgroup.tasks";
+static constexpr char CGROUP_PROCS_FILE[] = "/cgroup.procs";
+static constexpr char CGROUP_TASKS_FILE[] = "/tasks";
+static constexpr char CGROUP_TASKS_FILE_V2[] = "/cgroup.tasks";
 
 uint32_t CgroupController::version() const {
     CHECK(HasValue());
