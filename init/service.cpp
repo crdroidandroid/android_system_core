@@ -42,6 +42,7 @@
 #include <selinux/selinux.h>
 #include <system/thread_defs.h>
 
+#include "lmkd_service.h"
 #include "rlimit_parser.h"
 #include "util.h"
 
@@ -244,7 +245,7 @@ Service::Service(const std::string& name, unsigned flags, uid_t uid, gid_t gid,
       ioprio_class_(IoSchedClass_NONE),
       ioprio_pri_(0),
       priority_(0),
-      oom_score_adjust_(-1000),
+      oom_score_adjust_(DEFAULT_OOM_SCORE_ADJUST),
       start_order_(0),
       args_(args) {}
 
@@ -282,6 +283,10 @@ void Service::KillProcessGroup(int signal) {
         }
 
         if (r == 0) process_cgroup_empty_ = true;
+    }
+
+    if (oom_score_adjust_ != DEFAULT_OOM_SCORE_ADJUST) {
+        LmkdUnregister(name_, pid_);
     }
 }
 
@@ -624,8 +629,10 @@ Result<Success> Service::ParseNamespace(std::vector<std::string>&& args) {
 }
 
 Result<Success> Service::ParseOomScoreAdjust(std::vector<std::string>&& args) {
-    if (!ParseInt(args[1], &oom_score_adjust_, -1000, 1000)) {
-        return Error() << "oom_score_adjust value must be in range -1000 - +1000";
+    if (!ParseInt(args[1], &oom_score_adjust_, MIN_OOM_SCORE_ADJUST,
+                  MAX_OOM_SCORE_ADJUST)) {
+        return Error() << "oom_score_adjust value must be in range " << MIN_OOM_SCORE_ADJUST
+                       << " - +" << MAX_OOM_SCORE_ADJUST;
     }
     return Success();
 }
@@ -1072,7 +1079,7 @@ Result<Success> Service::Start() {
         return ErrnoError() << "Failed to fork";
     }
 
-    if (oom_score_adjust_ != -1000) {
+    if (oom_score_adjust_ != DEFAULT_OOM_SCORE_ADJUST) {
         std::string oom_str = std::to_string(oom_score_adjust_);
         std::string oom_file = StringPrintf("/proc/%d/oom_score_adj", pid);
         if (!WriteStringToFile(oom_str, oom_file)) {
@@ -1131,6 +1138,10 @@ Result<Success> Service::Start() {
                 PLOG(ERROR) << "setProcessGroupLimit failed";
             }
         }
+    }
+
+    if (oom_score_adjust_ != DEFAULT_OOM_SCORE_ADJUST) {
+        LmkdRegister(name_, uid_, pid_, oom_score_adjust_);
     }
 
     NotifyStateChange("running");
