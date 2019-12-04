@@ -351,7 +351,7 @@ bool init_poll_kernel(struct kernel_poll_info *poll_info) {
 
 static void proc_insert(struct proc* procp) {
     if (!pidhash) {
-        pidhash = calloc(PIDHASH_SZ, sizeof(struct proc));
+        pidhash = static_cast<struct proc**>(calloc(PIDHASH_SZ, sizeof(struct proc)));
     }
 
     int hval = pid_hashfn(procp->pid);
@@ -403,7 +403,7 @@ void stats_store_taskname(int pid, const char* taskname, int poll_fd) {
         }
         stats_remove_taskname(pid, poll_fd);
     }
-    procp = malloc(sizeof(struct proc));
+    procp = static_cast<struct proc*>(malloc(sizeof(struct proc)));
     procp->pid = pid;
     strncpy(procp->taskname, taskname, LINE_MAX - 1);
     procp->taskname[LINE_MAX - 1] = '\0';
