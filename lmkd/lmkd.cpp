@@ -212,7 +212,6 @@ static android_log_context ctx;
 enum polling_update {
     POLLING_DO_NOT_CHANGE,
     POLLING_START,
-    POLLING_STOP,
     POLLING_PAUSE,
     POLLING_RESUME,
 };
@@ -2925,9 +2924,12 @@ static void call_handler(struct event_handler_info* handler_info,
                          struct polling_params *poll_params, uint32_t events) {
     struct timespec curr_tm;
 
+    poll_params->update = POLLING_DO_NOT_CHANGE;
     handler_info->handler(handler_info->data, events, poll_params);
     clock_gettime(CLOCK_MONOTONIC_COARSE, &curr_tm);
-    poll_params->last_poll_tm = curr_tm;
+    if (poll_params->poll_handler == handler_info) {
+        poll_params->last_poll_tm = curr_tm;
+    }
 
     switch (poll_params->update) {
     case POLLING_START:
@@ -2938,9 +2940,6 @@ static void call_handler(struct event_handler_info* handler_info,
          */
         poll_params->poll_start_tm = curr_tm;
         poll_params->poll_handler = handler_info;
-        break;
-    case POLLING_STOP:
-        poll_params->poll_handler = NULL;
         break;
     case POLLING_PAUSE:
         poll_params->paused_handler = handler_info;
@@ -2954,11 +2953,10 @@ static void call_handler(struct event_handler_info* handler_info,
         if (get_time_diff_ms(&poll_params->poll_start_tm, &curr_tm) > PSI_WINDOW_SIZE_MS) {
             /* Polled for the duration of PSI window, time to stop */
             poll_params->poll_handler = NULL;
+            poll_params->paused_handler = NULL;
         }
-        /* WARNING: skipping the rest of the function */
-        return;
+        break;
     }
-    poll_params->update = POLLING_DO_NOT_CHANGE;
 }
 
 static void mainloop(void) {
@@ -2969,7 +2967,7 @@ static void mainloop(void) {
     long delay = -1;
 
     poll_params.poll_handler = NULL;
-    poll_params.update = POLLING_DO_NOT_CHANGE;
+    poll_params.paused_handler = NULL;
 
     while (1) {
         struct epoll_event events[maxevents];
