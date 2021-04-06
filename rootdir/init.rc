@@ -1153,7 +1153,6 @@ on bpf-progs-loaded
 # to start-zygote in device's init.rc to unblock zygote start.
 on zygote-start
     wait_for_prop odsign.verification.done 1
-    start statsd
     start zygote
     start zygote_secondary
 
