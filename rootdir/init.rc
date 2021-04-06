@@ -1142,7 +1142,6 @@ on zygote-start
     wait_for_prop odsign.verification.done 1
     # A/B update verifier that marks a successful boot.
     exec_start update_verifier
-    start statsd
     start zygote
     start zygote_secondary
 
