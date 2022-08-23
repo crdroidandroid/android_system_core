@@ -1417,7 +1417,6 @@ static void ProcessBootconfig() {
 }
 
 static void SetSafetyNetProps() {
-
     InitPropertySet("ro.boot.flash.locked", "1");
     InitPropertySet("ro.boot.vbmeta.device_state", "locked");
     InitPropertySet("ro.boot.verifiedbootstate", "green");
@@ -1426,15 +1425,22 @@ static void SetSafetyNetProps() {
     InitPropertySet("ro.warranty_bit", "0");
     InitPropertySet("ro.debuggable", "0");
     InitPropertySet("ro.secure", "1");
+    InitPropertySet("ro.bootimage.build.type", "user");
     InitPropertySet("ro.build.type", "user");
     InitPropertySet("ro.build.keys", "release-keys");
     InitPropertySet("ro.build.tags", "release-keys");
     InitPropertySet("ro.system.build.tags", "release-keys");
+    InitPropertySet("ro.product.build.type", "user");
+    InitPropertySet("ro.odm.build.type", "user");
+    InitPropertySet("ro.system.build.type", "user");
+    InitPropertySet("ro.system_ext.build.type", "user");
+    InitPropertySet("ro.vendor.build.type", "user");
+    InitPropertySet("ro.vendor_dlkm.build.type", "user");
     InitPropertySet("ro.vendor.boot.warranty_bit", "0");
     InitPropertySet("ro.vendor.warranty_bit", "0");
     InitPropertySet("vendor.boot.vbmeta.device_state", "locked");
     InitPropertySet("vendor.boot.verifiedbootstate", "green");
-
+    InitPropertySet("oplusboot.verifiedbootstate", "green");
 }
 
 void PropertyInit() {
