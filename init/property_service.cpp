@@ -1181,7 +1181,8 @@ static void SetSafetyNetProps() {
         {"vendor.boot.vbmeta.device_state", "locked"},
         {"vendor.boot.verifiedbootstate", "green"},
         {"oplusboot.verifiedbootstate", "green"},
-        {"sys.oem_unlock_allowed", "0"}
+        {"sys.oem_unlock_allowed", "0"},
+        {"ro.crypto.state", "encrypted"}
     };
 
     for (const auto& [name, value] : props) {
