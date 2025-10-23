@@ -1172,6 +1172,7 @@ static void SetSafetyNetProps() {
         {"ro.build.tags", "release-keys"},
         {"ro.system.build.tags", "release-keys"},
         {"ro.product.build.type", "user"},
+        {"ro.system_dlkm.build.type", "user"},
         {"ro.odm.build.type", "user"},
         {"ro.system.build.type", "user"},
         {"ro.system_ext.build.type", "user"},
@@ -1192,6 +1193,59 @@ static void SetSafetyNetProps() {
         } else {
             LOG(ERROR) << "Failed to set property '" << name
                        << "' to '" << value << "': err=" << res << " (" << error << ")";
+        }
+    }
+}
+
+void LoadReleaseBuildProperties() {
+    std::string error;
+    uint32_t res;
+
+    const char* FLAVOR_PROP = "ro.build.flavor";
+    std::string flavor_value = GetProperty(FLAVOR_PROP, "");
+
+    if (!flavor_value.empty()) {
+        if (flavor_value.find("lineage_") == 0) {
+            flavor_value.erase(0, std::string("lineage_").length());
+        }
+
+        size_t pos = flavor_value.find("userdebug");
+        if (pos != std::string::npos) {
+            flavor_value.replace(pos, std::string("userdebug").length(), "user");
+        }
+
+        res = PropertySetNoSocket(FLAVOR_PROP, flavor_value, &error);
+        if (res == PROP_SUCCESS) {
+            LOG(INFO) << "Property '" << FLAVOR_PROP << "' set to '" << flavor_value << "'";
+        } else {
+            LOG(ERROR) << "Failed to set property '" << FLAVOR_PROP
+                       << "' to '" << flavor_value << "': err=" << res << " (" << error << ")";
+        }
+    }
+
+    const char* DISPLAY_ID_PROP = "ro.build.display.id";
+    std::string display_id = GetProperty(DISPLAY_ID_PROP, "");
+
+    if (!display_id.empty()) {
+        std::istringstream iss(display_id);
+        std::string token;
+        std::string numeric_build;
+
+        while (iss >> token) {
+            if (token.find('.') != std::string::npos && std::any_of(token.begin(), token.end(), ::isdigit)) {
+                numeric_build = token;
+                break;
+            }
+        }
+
+        if (!numeric_build.empty()) {
+            res = PropertySetNoSocket(DISPLAY_ID_PROP, numeric_build, &error);
+            if (res == PROP_SUCCESS) {
+                LOG(INFO) << "Property '" << DISPLAY_ID_PROP << "' set to '" << numeric_build << "'";
+            } else {
+                LOG(ERROR) << "Failed to set property '" << DISPLAY_ID_PROP
+                           << "' to '" << numeric_build << "': err=" << res << " (" << error << ")";
+            }
         }
     }
 }
@@ -1311,6 +1365,8 @@ void PropertyLoadBootDefaults() {
         SetSafetyNetProps();
       }
     }
+
+    LoadReleaseBuildProperties();
 
     // Restore the normal property override security after init extension is executed
     weaken_prop_override_security = false;
