@@ -1182,7 +1182,12 @@ static void SetSafetyNetProps() {
         {"vendor.boot.verifiedbootstate", "green"},
         {"oplusboot.verifiedbootstate", "green"},
         {"sys.oem_unlock_allowed", "0"},
-        {"ro.crypto.state", "encrypted"}
+        {"ro.oem_unlock_supported", "0"},
+        {"ro.crypto.state", "encrypted"},
+        {"ro.boot.flash.locked", "1"},
+        {"ro.is_ever_orange", "0"},
+        {"ro.secureboot.devicelock", "1"},
+        {"ro.secureboot.lockstate", "locked"}
     };
 
     for (const auto& [name, value] : props) {
