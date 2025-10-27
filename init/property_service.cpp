@@ -63,6 +63,10 @@
 #include <selinux/selinux.h>
 #include <vendorsupport/api_level.h>
 
+#include <sys/ioctl.h>
+#include <linux/fs.h>
+#include <linux/blkpg.h>
+
 #include "debug_ramdisk.h"
 #include "epoll.h"
 #include "init.h"
@@ -1122,7 +1126,6 @@ static void SetSafetyNetProps() {
 
     const std::pair<const char*, const char*> props[] = {
         {"ro.boot.flash.locked", "1"},
-        {"ro.boot.vbmeta.device_state", "locked"},
         {"ro.boot.verifiedbootstate", "green"},
         {"ro.boot.veritymode", "enforcing"},
         {"ro.boot.warranty_bit", "0"},
@@ -1165,6 +1168,43 @@ static void SetSafetyNetProps() {
             LOG(ERROR) << "Failed to set property '" << name
                        << "' to '" << value << "': err=" << res << " (" << error << ")";
         }
+    }
+}
+
+static void SetPropIfEmpty(const char* name, const char* value) {
+    std::string cur = GetProperty(name, "");
+    if (cur.empty()) {
+        std::string error;
+        auto res = PropertySetNoSocket(name, value, &error);
+        if (res != PROP_SUCCESS) {
+            LOG(ERROR) << "Failed to set property '" << name
+                       << "' to '" << value << "': err=" << res << " (" << error << ")";
+        }
+    }
+}
+
+static void SetVbmetaBootProps() {
+    const std::string persisted = GetProperty("persist.sys.vbmeta.digest", "");
+    if (!persisted.empty() && GetProperty("ro.boot.vbmeta.digest", "").empty()) {
+        InitPropertySet("ro.boot.vbmeta.digest", persisted);
+    }
+
+    SetPropIfEmpty("ro.boot.vbmeta.device_state", "locked");
+    SetPropIfEmpty("ro.boot.vbmeta.invalidate_on_error", "yes");
+    SetPropIfEmpty("ro.boot.vbmeta.avb_version", "1.0");
+    SetPropIfEmpty("ro.boot.vbmeta.hash_alg", "sha256");
+
+    {
+        std::string slot_suffix = GetProperty("ro.boot.slot_suffix", "");
+        std::string path = "/dev/block/by-name/vbmeta";
+        if (!slot_suffix.empty()) path += slot_suffix;
+        int fd = TEMP_FAILURE_RETRY(open(path.c_str(), O_RDONLY | O_CLOEXEC));
+        uint64_t blksz = 0;
+        if (ioctl(fd, BLKGETSIZE64, &blksz) == 0 && blksz > 0) {
+            std::string blksz_str = std::to_string(blksz);
+            SetPropIfEmpty("ro.boot.vbmeta.size", blksz_str.c_str());
+        }
+        close(fd);
     }
 }
 
@@ -1435,7 +1475,6 @@ static void ProcessKernelCmdline() {
     });
 }
 
-
 static void ProcessBootconfig() {
     android::fs_mgr::ImportBootconfig([&](const std::string& key, const std::string& value) {
         if (StartsWith(key, ANDROIDBOOT_PREFIX)) {
@@ -1456,6 +1495,12 @@ void PropertyInit() {
     }
     if (!property_info_area.LoadDefaultPath()) {
         LOG(FATAL) << "Failed to load serialized property info file";
+    }
+
+    if (SPOOF_SAFETYNET) {
+      if (!IsRecoveryMode()) {
+        SetVbmetaBootProps();
+      }
     }
 
     // If arguments are passed both on the command line and in DT,
@@ -1505,6 +1550,12 @@ static void HandleInitSocket() {
             }
             InitPropertySet("ro.persistent_properties.ready", "true");
             persistent_properties_loaded = true;
+
+            if (SPOOF_SAFETYNET) {
+              if (!IsRecoveryMode()) {
+                SetVbmetaBootProps();
+              }
+            }
             break;
         }
         default:

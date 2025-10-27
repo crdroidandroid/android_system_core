@@ -136,7 +136,7 @@ std::unique_ptr<AvbVerifier> AvbVerifier::Create() {
     // Reads digest.
     std::string digest;
     fs_mgr_get_boot_config("vbmeta.digest", &digest);
-    if (digest.size() != expected_digest_size) {
+    if (digest.size() == 0) {
         LERROR << "Unexpected digest size: " << digest.size()
                << " (expected: " << expected_digest_size << ")";
         return nullptr;

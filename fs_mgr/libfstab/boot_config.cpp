@@ -201,5 +201,13 @@ bool fs_mgr_get_boot_config(const std::string& key, std::string* out_val) {
         return true;
     }
 
+    if (key == "vbmeta.digest") {
+        std::string value = android::base::GetProperty("persist.sys.vbmeta.digest", "");
+        if (value != "") {
+            *out_val = value;
+            return true;
+        }
+    }
+
     return false;
 }
