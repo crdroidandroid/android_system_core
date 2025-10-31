@@ -1154,7 +1154,7 @@ static void SetSafetyNetProps() {
         {"sys.oem_unlock_allowed", "0"},
         {"ro.oem_unlock_supported", "0"},
         {"ro.crypto.state", "encrypted"},
-        {"ro.boot.flash.locked", "1"},
+        {"ro.boot.vbmeta.device_state", "locked"},
         {"ro.is_ever_orange", "0"},
         {"ro.secureboot.devicelock", "1"},
         {"ro.secureboot.lockstate", "locked"}
@@ -1184,12 +1184,16 @@ static void SetPropIfEmpty(const char* name, const char* value) {
 }
 
 static void SetVbmetaBootProps() {
+    const std::string update = GetProperty("persist.sys.vbmeta.update", "true");
+    if (update == "false") {
+        return;
+    }
+
     const std::string persisted = GetProperty("persist.sys.vbmeta.digest", "");
     if (!persisted.empty() && GetProperty("ro.boot.vbmeta.digest", "").empty()) {
         InitPropertySet("ro.boot.vbmeta.digest", persisted);
     }
 
-    SetPropIfEmpty("ro.boot.vbmeta.device_state", "locked");
     SetPropIfEmpty("ro.boot.vbmeta.invalidate_on_error", "yes");
     SetPropIfEmpty("ro.boot.vbmeta.avb_version", "1.0");
     SetPropIfEmpty("ro.boot.vbmeta.hash_alg", "sha256");
@@ -1495,12 +1499,6 @@ void PropertyInit() {
     }
     if (!property_info_area.LoadDefaultPath()) {
         LOG(FATAL) << "Failed to load serialized property info file";
-    }
-
-    if (SPOOF_SAFETYNET) {
-      if (!IsRecoveryMode()) {
-        SetVbmetaBootProps();
-      }
     }
 
     // If arguments are passed both on the command line and in DT,
