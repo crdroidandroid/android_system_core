@@ -890,6 +890,12 @@ on post-fs-data
     chown system system /data/adb/tricky_store
     restorecon_recursive /data/adb/tricky_store
 
+    # PlayIntegrityFix
+    mkdir /data/adb/playintegrityfix 0775 system system
+    chmod 0775 /data/adb/playintegrityfix
+    chown system system /data/adb/playintegrityfix
+    restorecon_recursive /data/adb/playintegrityfix
+
     # Directory for VirtualizationService temporary image files.
     # Delete any stale files owned by the old virtualizationservice uid (b/230056726).
     chmod 0770 /data/misc/virtualizationservice
@@ -1183,6 +1189,7 @@ on boot
     # TrickyStore - fix permissions on /data/adb for keybox access
     chmod 0711 /data/adb
     chmod 0775 /data/adb/tricky_store
+    chmod 0775 /data/adb/playintegrityfix
     
     # basic network init
     ifup lo
