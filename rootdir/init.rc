@@ -575,7 +575,9 @@ on late-init
     # /data, which in turn can only be loaded when system properties are present.
     trigger post-fs-data
 
-    # Should be before netd, but after apex, properties and logging is available.
+    # bpfloader can be started earlier once apexd.status=activated
+    # Though, we should keep the event still being triggered, so which want to
+    # start ASAP can be notified, still.
     trigger load-bpf-programs
     trigger bpf-progs-loaded
 
@@ -1072,6 +1074,33 @@ on post-fs-data
     exec_start mainline_aconfigd_init
     start mainline_aconfigd_socket_service
 
+    # It is important that we start bpfloader after:
+    #   - /sys/fs/bpf is already mounted,
+    #   - apex (incl. rollback) is activated (so that we can load bpf
+    #     programs shipped as part of apex mainline modules)
+    #   - logd is ready for us to log stuff
+    #   - aconfig flags are initialized (since bpf programs can be
+    #     conditionally loaded based on feature flags)
+    #
+    # At the same time we want to be as early as possible to reduce races and thus
+    # failures (before memory is fragmented, and cpu is busy running tons of other
+    # stuff) and we absolutely want to be before netd and the system boot slot is
+    # considered to have booted successfully.
+    # Temporarily relax access to kallsyms so that bpfloader can resolve kernel symbols
+    # at load time.
+    #
+    # NOTE: Still requires CAP_SYSLOG and sepolicy allow rules to read /proc/kallsyms
+    write /proc/sys/kernel/kptr_restrict 1
+
+    # Should be before netd, but after apex is activated, properties and logging is available.
+    exec_start bpfloader
+
+    # Restore kallsyms protection after bpf programs have been loaded.
+    write /proc/sys/kernel/kptr_restrict 2
+
+    # Should be after bpfloader
+    start netd
+
     # Create directories for boot animation.
     mkdir /data/misc/bootanim 0755 system system
 
@@ -1123,31 +1152,6 @@ on post-fs-data
 
 on property:vold.checkpoint_committed=1
     trigger post-fs-data-checkpointed
-
-# It is important that we start bpfloader after:
-#   - /sys/fs/bpf is already mounted,
-#   - apex (incl. rollback) is initialized (so that we can load bpf
-#     programs shipped as part of apex mainline modules)
-#   - logd is ready for us to log stuff
-#
-# At the same time we want to be as early as possible to reduce races and thus
-# failures (before memory is fragmented, and cpu is busy running tons of other
-# stuff) and we absolutely want to be before netd and the system boot slot is
-# considered to have booted successfully.
-on load-bpf-programs
-    # Temporarily relax access to kallsyms so that bpfloader can resolve kernel symbols
-    # at load time.
-    #
-    # NOTE: Still requires CAP_SYSLOG and sepolicy allow rules to read /proc/kallsyms
-    write /proc/sys/kernel/kptr_restrict 1
-
-    exec_start bpfloader
-
-    # Restore kallsyms protection after bpf programs have been loaded.
-    write /proc/sys/kernel/kptr_restrict 2
-
-on bpf-progs-loaded
-    start netd
 
 # It is recommended to put unnecessary data/ initialization from post-fs-data
 # to start-zygote in device's init.rc to unblock zygote start.
