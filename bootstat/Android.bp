@@ -31,9 +31,12 @@ cc_defaults {
         "-Werror",
     ],
     shared_libs: [
+        "android.hardware.health-V4-ndk",
         "libbase",
+        "libbinder_ndk",
         "libcutils",
         "liblog",
+        "libutils",
     ],
     header_libs: ["libgtest_prod_headers"],
 }

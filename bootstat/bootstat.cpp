@@ -44,10 +44,13 @@
 #include <android-base/parseint.h>
 #include <android-base/properties.h>
 #include <android-base/strings.h>
+#include <android/binder_manager.h>
 #include <android/log.h>
 #include <cutils/android_reboot.h>
 #include <cutils/properties.h>
 #include <statslog_bootstats.h>
+
+#include <aidl/android/hardware/health/IHealth.h>
 
 #include "boot_event_record_store.h"
 
@@ -977,6 +980,33 @@ void BootReasonAddToHistory(const std::string& system_boot_reason) {
   }
 }
 
+// Get the battery level from the Health HAL.
+int32_t GetBatteryLevel() {
+  using aidl::android::hardware::health::HealthInfo;
+  using aidl::android::hardware::health::IHealth;
+
+  std::string service_name = std::string(IHealth::descriptor) + "/default";
+  ndk::SpAIBinder binder(AServiceManager_checkService(service_name.c_str()));
+  if (binder.get() == nullptr) {
+    LOG(WARNING) << "Failed to find the Health HAL service: " << service_name;
+    return -1;
+  }
+
+  std::shared_ptr<IHealth> health = IHealth::fromBinder(binder);
+  if (health == nullptr) {
+    LOG(WARNING) << "Failed to connect to the Health HAL service";
+    return -1;
+  }
+
+  HealthInfo health_info;
+  if (!health->getHealthInfo(&health_info).isOk()) {
+    LOG(WARNING) << "Failed to get health info from the Health HAL";
+    return -1;
+  }
+
+  return health_info.batteryLevel;
+}
+
 // Scrub, Sanitize, Standardize and Enhance the boot reason string supplied.
 std::string BootReasonStrToReason(const std::string& boot_reason) {
   auto ret = android::base::GetProperty(system_reboot_reason_property, "");
@@ -1116,8 +1146,6 @@ std::string BootReasonStrToReason(const std::string& boot_reason) {
       (void)addKernelPanicSubReason(console, ret);
     }
 
-    // TODO: use the HAL to get battery level (http://b/77725702).
-
     // Is there a controlled shutdown hint in last_reboot_reason_property?
     if (isBluntRebootReason(ret)) {
       // Content buffer no longer will have console data. Beware if more
@@ -1130,6 +1158,14 @@ std::string BootReasonStrToReason(const std::string& boot_reason) {
       // Anything in last is better than 'super-blunt' reboot or shutdown.
       if ((ret == "") || (ret == "reboot") || (ret == "shutdown") || !isBluntRebootReason(content)) {
         ret = content;
+      }
+    }
+
+    // Use the HAL to get battery level (http://b/77725702).
+    if (isBluntRebootReason(ret)) {
+      int32_t level = GetBatteryLevel();
+      if (level >= 0 && level <= 2) {
+        ret = "shutdown,battery";
       }
     }
 
