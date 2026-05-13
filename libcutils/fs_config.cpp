@@ -317,7 +317,7 @@ auto __for_testing_only__fs_config_cmp = fs_config_cmp;
 
 bool get_fs_config(const char* path, bool dir, const char* target_out_path,
                    struct fs_config* fs_conf) {
-    if (path[0] == '/') {
+    while (path[0] == '/') {
         path++;
     }
 
