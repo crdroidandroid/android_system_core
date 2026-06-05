@@ -3506,7 +3506,11 @@ auto SnapshotManager::OpenFile(const std::string& file, int lock_flags)
     const auto start = std::chrono::system_clock::now();
     unique_fd fd(open(file.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
     if (fd < 0) {
+#ifdef __ANDROID_RECOVERY__
+        PLOG(WARNING) << "Open failed: " << file;
+#else
         PLOG(ERROR) << "Open failed: " << file;
+#endif
         return nullptr;
     }
     if (lock_flags != 0 && TEMP_FAILURE_RETRY(flock(fd, lock_flags)) < 0) {
