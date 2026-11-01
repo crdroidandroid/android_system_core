@@ -409,7 +409,10 @@ static std::optional<uint32_t> PropertySet(const std::string& name, const std::s
                 return {PROP_ERROR_READ_ONLY_PROPERTY};
             }
 
-            __system_property_update(pi, value.c_str(), valuelen);
+            if (__system_property_update(pi, value.c_str(), valuelen) < 0) {
+                *error = "__system_property_update failed";
+                return {PROP_ERROR_SET_FAILED};
+            }
         } else {
             int rc = __system_property_add(name.c_str(), name.size(), value.c_str(), valuelen);
             if (rc < 0) {
