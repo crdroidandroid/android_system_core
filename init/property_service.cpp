@@ -1185,20 +1185,36 @@ static std::string GetVbmetaSize() {
         return "";
     }
     
+    uint8_t header[256];
+    ssize_t n = read(fd, header, sizeof(header));
     uint64_t size = 0;
-    if (ioctl(fd, BLKGETSIZE64, &size) < 0) {
-        LOG(ERROR) << "GetVbmetaSize: ioctl(BLKGETSIZE64) failed for " << path << ": " << strerror(errno);
-        off_t seek_size = lseek(fd, 0, SEEK_END);
-        if (seek_size < 0) {
-            LOG(ERROR) << "GetVbmetaSize: lseek failed for " << path << ": " << strerror(errno);
-            close(fd);
-            return "";
+    if (n < 28 || memcmp(header, "AVB0", 4) != 0) {
+        LOG(ERROR) << "GetVbmetaSize: No AVB0 magic in " << path << ", falling back to partition size";
+        if (ioctl(fd, BLKGETSIZE64, &size) < 0) {
+            off_t seek_size = lseek(fd, 0, SEEK_END);
+            size = (seek_size > 0) ? static_cast<uint64_t>(seek_size) : 0;
         }
-        size = static_cast<uint64_t>(seek_size);
+    } else {
+        uint64_t auth = 0, aux = 0;
+        for (int i = 12; i < 20; i++) auth = (auth << 8) | header[i];
+        for (int i = 20; i < 28; i++) aux = (aux << 8) | header[i];
+        size = 256 + auth + aux;
+        if (size < 256 || size > 1048576) {
+            LOG(ERROR) << "GetVbmetaSize: implausible AVB image size " << size
+                       << ", falling back to partition size";
+            if (ioctl(fd, BLKGETSIZE64, &size) < 0) {
+                off_t seek_size = lseek(fd, 0, SEEK_END);
+                size = (seek_size > 0) ? static_cast<uint64_t>(seek_size) : 0;
+            }
+        }
     }
     
     close(fd);
     
+    if (size == 0) {
+        LOG(ERROR) << "GetVbmetaSize: could not determine size of " << path;
+        return "";
+    }
     LOG(INFO) << "GetVbmetaSize: Size of " << path << ": " << size;
     return std::to_string(size);
 }
