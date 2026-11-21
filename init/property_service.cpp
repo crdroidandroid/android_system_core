@@ -1243,7 +1243,10 @@ static void SetSafetyNetProps() {
         {"ro.boot.flash.locked", "1"},
         {"ro.is_ever_orange", "0"},
         {"ro.secureboot.devicelock", "1"},
-        {"ro.secureboot.lockstate", "locked"}
+        {"ro.secureboot.lockstate", "locked"},
+        {"ro.boot.selinux", "enforcing"},
+        {"ro.build.selinux", "1"},
+        {"ro.build.selinux.enforce", "1"}
     };
 
     for (const auto& [name, value] : props) {
